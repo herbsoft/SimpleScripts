@@ -3,7 +3,7 @@
 #
 
 from time import sleep
-import piconzero as pz, time
+import piconzero as pz
 
 print ("Halloween animation using servos")
 print ("Press Ctrl-C to end")
