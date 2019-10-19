@@ -1,6 +1,8 @@
 # Based on original source - https://picamera.readthedocs.io/en/latest/recipes2.html#web-streaming
 # Once the script is running, visit http://your-pi-address:8000/ with your web-browser to view the video stream.
 #
+# Extended to display a low res and a high res stream. The aim being to use the low res version for image
+# processing whilst still allowing the high res one for navigation
 
 import io
 import picamera
@@ -12,11 +14,16 @@ from http import server
 PAGE="""\
 <html>
 <head>
-<title>PiCamera Streaming</title>
+<title>Team Diddybot Streaming</title>
 </head>
 <body>
-<h1>PiCamera Streaming</h1>
-<img src="stream.mjpg" width="640" height="480" />
+<h1>Team Diddybot Streaming</h1>
+<table>
+<tr>
+<td><img src="hires.mjpg" width="640" height="480" /></td>
+<td><img src="lowres.mjpg" width="640" height="480" /></td>
+</tr>
+</table>
 </body>
 </html>
 """
@@ -51,7 +58,7 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header('Content-Length', len(content))
             self.end_headers()
             self.wfile.write(content)
-        elif self.path == '/stream.mjpg':
+        elif self.path == '/hires.mjpg':
             self.send_response(200)
             self.send_header('Age', 0)
             self.send_header('Cache-Control', 'no-cache, private')
@@ -60,9 +67,31 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
             try:
                 while True:
-                    with output.condition:
-                        output.condition.wait()
-                        frame = output.frame
+                    with hiResOutput.condition:
+                        hiResOutput.condition.wait()
+                        frame = hiResOutput.frame
+                    self.wfile.write(b'--FRAME\r\n')
+                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Length', len(frame))
+                    self.end_headers()
+                    self.wfile.write(frame)
+                    self.wfile.write(b'\r\n')
+            except Exception as e:
+                logging.warning(
+                    'Removed streaming client %s: %s',
+                    self.client_address, str(e))
+        elif self.path == '/lowres.mjpg':
+            self.send_response(200)
+            self.send_header('Age', 0)
+            self.send_header('Cache-Control', 'no-cache, private')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+            self.end_headers()
+            try:
+                while True:
+                    with lowResOutput.condition:
+                        lowResOutput.condition.wait()
+                        frame = lowResOutput.frame
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', len(frame))
@@ -82,11 +111,14 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     daemon_threads = True
 
 with picamera.PiCamera(resolution='640x480', framerate=24) as camera:
-    output = StreamingOutput()
-    camera.start_recording(output, format='mjpeg')
+    hiResOutput = StreamingOutput()
+    lowResOutput = StreamingOutput()
+    camera.start_recording(hiResOutput, format='mjpeg')
+    camera.start_recording(lowResOutput, format='mjpeg', splitter_port=2, resize=(80, 60))
     try:
         address = ('', 8000)
         server = StreamingServer(address, StreamingHandler)
         server.serve_forever()
     finally:
+        camera.stop_recording(splitter_port=2)
         camera.stop_recording()
