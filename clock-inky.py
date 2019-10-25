@@ -1,3 +1,7 @@
+# ------------------------------------------------------------------------------
+# Use of subprocess breaks the ability to run this via @reboot option in crontab
+# ------------------------------------------------------------------------------
+
 from inky import InkyPHAT
 from PIL import Image, ImageFont, ImageDraw
 from font_fredoka_one import FredokaOne
