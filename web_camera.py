@@ -11,6 +11,8 @@ import socketserver
 from threading import Condition
 from http import server
 
+# ------------------------------------------------------------------------------
+
 PAGE="""\
 <html>
 <head>
@@ -28,6 +30,8 @@ PAGE="""\
 </html>
 """
 
+# ------------------------------------------------------------------------------
+
 class StreamingOutput(object):
     def __init__(self):
         self.frame = None
@@ -44,6 +48,8 @@ class StreamingOutput(object):
                 self.condition.notify_all()
             self.buffer.seek(0)
         return self.buffer.write(buf)
+
+# ------------------------------------------------------------------------------
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -106,9 +112,13 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_error(404)
             self.end_headers()
 
+# ------------------------------------------------------------------------------
+
 class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
+
+# ------------------------------------------------------------------------------
 
 with picamera.PiCamera(resolution='640x480', framerate=24) as camera:
     hiResOutput = StreamingOutput()
